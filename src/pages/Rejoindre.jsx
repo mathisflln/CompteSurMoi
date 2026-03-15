@@ -16,74 +16,77 @@ export default function Rejoindre() {
     chargerInvitation()
   }, [])
 
-  async function chargerInvitation() {
-    // 1. Vérifier que l'invitation existe et n'est pas expirée
-    const { data: invitation, error } = await supabase
-      .from('invitations')
-      .select('id_groupe, expires_at')
-      .eq('id', token)
-      .single()
+async function chargerInvitation() {
+  const { data: invitation, error } = await supabase
+    .from('invitations')
+    .select('id_groupe, expires_at')
+    .eq('id', token)
+    .maybeSingle()
 
-    if (error || !invitation) {
-      setErreur('Ce lien d\'invitation est invalide ou a expiré.')
-      setChargement(false)
-      return
-    }
-
-    if (new Date(invitation.expires_at) < new Date()) {
-      setErreur('Ce lien d\'invitation a expiré.')
-      setChargement(false)
-      return
-    }
-
-    // 2. Charger les infos du groupe
-    const { data: groupeData } = await supabase
-      .from('groupes')
-      .select('*')
-      .eq('id', invitation.id_groupe)
-      .single()
-
-    // 3. Charger les membres
-    const { data: membresData } = await supabase
-      .from('membres')
-      .select('id, profils(pseudo)')
-      .eq('id_groupe', invitation.id_groupe)
-
-    setGroupe({ ...groupeData, invitationId: invitation.id_groupe })
-    setMembres(membresData || [])
+  if (error || !invitation) {
+    setErreur('Ce lien d\'invitation est invalide ou a expiré.')
     setChargement(false)
+    return
   }
+
+  if (new Date(invitation.expires_at) < new Date()) {
+    setErreur('Ce lien d\'invitation a expiré.')
+    setChargement(false)
+    return
+  }
+
+  const { data: groupeData } = await supabase
+    .from('groupes')
+    .select('*')
+    .eq('id', invitation.id_groupe)
+    .maybeSingle()
+
+  const { data: membresData } = await supabase
+    .from('membres')
+    .select('id, profils(pseudo)')
+    .eq('id_groupe', invitation.id_groupe)
+
+  setGroupe(groupeData)  // plus d'écrasement de id
+  setMembres(membresData || [])
+  setChargement(false)
+}
 
   async function handleRejoindre() {
-    setRejoindreChargement(true)
+  setRejoindreChargement(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
 
-    // Vérifier si déjà membre
-    const { data: dejaMembre } = await supabase
-      .from('membres')
-      .select('id')
-      .eq('id_groupe', groupe.id)
-      .eq('id_profil', user.id)
-      .single()
-
-    if (dejaMembre) {
-      navigate(`/groupe/${groupe.id}`)
-      return
+    if (!session) {
+        navigate(`/connexion?redirect=/rejoindre/${token}`)
+        return
     }
 
-    const { error } = await supabase
-      .from('membres')
-      .insert({ id_profil: user.id, id_groupe: groupe.id })
+  const user = session.user
 
-    if (error) {
-      setErreur('Erreur lors de l\'ajout au groupe.')
-      setRejoindreChargement(false)
-      return
-    }
+  const { data: dejaMembre } = await supabase
+    .from('membres')
+    .select('id')
+    .eq('id_groupe', groupe.id)
+    .eq('id_profil', user.id)
+    .single()
 
+  if (dejaMembre) {
     navigate(`/groupe/${groupe.id}`)
+    return
   }
+
+  const { error } = await supabase
+    .from('membres')
+    .insert({ id_profil: user.id, id_groupe: groupe.id })
+
+  if (error) {
+    setErreur('Erreur lors de l\'ajout au groupe.')
+    setRejoindreChargement(false)
+    return
+  }
+
+  navigate(`/groupe/${groupe.id}`)
+}
 
   if (chargement) return <div className="p-6 text-sm text-muted-foreground">Chargement...</div>
 

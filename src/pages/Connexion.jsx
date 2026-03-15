@@ -1,35 +1,37 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 
-
 export default function Connexion() {
-    const navigate = useNavigate()
-    const [email, setEmail] = useState('')
-    const [motDePasse, setMotDePasse] = useState('')
-    const [erreur, setErreur] = useState(null)
-    const [chargement, setChargement] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [email, setEmail] = useState('')
+  const [motDePasse, setMotDePasse] = useState('')
+  const [erreur, setErreur] = useState(null)
+  const [chargement, setChargement] = useState(false)
 
-    async function handleConnexion() {
+  async function handleConnexion() {
     setChargement(true)
     setErreur(null)
 
     const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: motDePasse,
+      email,
+      password: motDePasse,
     })
 
     if (error) {
-        setErreur('Email ou mot de passe incorrect.')
+      setErreur('Email ou mot de passe incorrect.')
     } else {
-        navigate('/groupes')
+      const params = new URLSearchParams(location.search)
+      const redirect = params.get('redirect')
+      navigate(redirect || '/groupes')
     }
 
     setChargement(false)
-    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col p-6">
@@ -70,7 +72,17 @@ export default function Connexion() {
           Mot de passe oublié ? <span className="text-foreground font-medium cursor-pointer">Réinitialiser</span>
         </p>
         <p className="text-sm text-muted-foreground">
-          Pas de compte ? <span onClick={() => navigate('/inscription')} className="text-foreground font-medium cursor-pointer">S'inscrire</span>
+        Pas de compte ?{' '}
+        <span 
+            onClick={() => {
+            const params = new URLSearchParams(location.search)
+            const redirect = params.get('redirect')
+            navigate(`/inscription${redirect ? `?redirect=${redirect}` : ''}`)
+            }} 
+            className="text-foreground font-medium cursor-pointer"
+        >
+            S'inscrire
+        </span>
         </p>
       </div>
     </div>

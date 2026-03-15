@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
+import { useLocation } from 'react-router-dom'
+
 
 export default function Inscription() {
   const navigate = useNavigate()
@@ -12,6 +14,7 @@ export default function Inscription() {
   const [motDePasse, setMotDePasse] = useState('')
   const [erreur, setErreur] = useState(null)
   const [chargement, setChargement] = useState(false)
+  const location = useLocation()
 
   async function handleInscription() {
     setChargement(true)
@@ -39,7 +42,10 @@ export default function Inscription() {
       return
     }
 
-    navigate('/groupes')
+    const params = new URLSearchParams(location.search)
+    const redirect = params.get('redirect')
+    navigate(redirect || '/groupes')
+    
     setChargement(false)
   }
 

@@ -3,19 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 
-async function genererLienInvitation() {
-  const { data, error } = await supabase
-    .from('invitations')
-    .insert({ id_groupe: id })
-    .select()
-    .single()
-
-  if (!error) {
-    const lien = `${window.location.origin}/rejoindre/${data.id}`
-    navigator.clipboard.writeText(lien)
-    alert('Lien copié dans le presse-papier !')
-  }
-}
 
 export default function Groupe() {
   const { id } = useParams()
@@ -29,6 +16,20 @@ export default function Groupe() {
   useEffect(() => {
     chargerGroupe()
   }, [])
+
+async function genererLienInvitation() {
+    const { data, error } = await supabase
+      .from('invitations')
+      .insert({ id_groupe: id })
+      .select()
+      .single()
+
+    if (!error) {
+      const lien = `${window.location.origin}/rejoindre/${data.id}`
+      navigator.clipboard.writeText(lien)
+      alert('Lien copié dans le presse-papier !')
+    }
+  }
 
   async function chargerGroupe() {
     const { data: { user } } = await supabase.auth.getUser()
