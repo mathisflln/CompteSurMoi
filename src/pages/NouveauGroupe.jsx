@@ -31,7 +31,7 @@ async function handleCreer() {
       return
     }
 
-    navigate(`/groupe/${data}`)
+    navigate(`/groupe/${data}/cree`)
   }
 
   return (
