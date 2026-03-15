@@ -79,7 +79,7 @@ async function genererLienInvitation() {
       </div>
 
       <div className="flex gap-2 flex-wrap">
-        {membres.map(m => (
+        {membres.filter(m => m.profils).map(m => (
           <div key={m.id} className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1">
             <div className="w-5 h-5 rounded-full bg-background flex items-center justify-center text-xs font-medium">
               {m.profils.pseudo.slice(0, 2).toUpperCase()}

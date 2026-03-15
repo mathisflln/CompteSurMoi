@@ -16,83 +16,90 @@ export default function Rejoindre() {
     chargerInvitation()
   }, [])
 
-async function chargerInvitation() {
-  const { data: invitation, error } = await supabase
-    .from('invitations')
-    .select('id_groupe, expires_at')
-    .eq('id', token)
-    .maybeSingle()
+  async function chargerInvitation() {
+    const { data: invitation, error } = await supabase
+      .from('invitations')
+      .select('id_groupe, expires_at')
+      .eq('id', token)
+      .maybeSingle()
 
-  if (error || !invitation) {
-    setErreur('Ce lien d\'invitation est invalide ou a expiré.')
-    setChargement(false)
-    return
-  }
-
-  if (new Date(invitation.expires_at) < new Date()) {
-    setErreur('Ce lien d\'invitation a expiré.')
-    setChargement(false)
-    return
-  }
-
-  const { data: groupeData } = await supabase
-    .from('groupes')
-    .select('*')
-    .eq('id', invitation.id_groupe)
-    .maybeSingle()
-
-  const { data: membresData } = await supabase
-    .from('membres')
-    .select('id, profils(pseudo)')
-    .eq('id_groupe', invitation.id_groupe)
-
-  setGroupe(groupeData)  // plus d'écrasement de id
-  setMembres(membresData || [])
-  setChargement(false)
-}
-
-  async function handleRejoindre() {
-  setRejoindreChargement(true)
-
-  const { data: { session } } = await supabase.auth.getSession()
-
-    if (!session) {
-        navigate(`/connexion?redirect=/rejoindre/${token}`)
-        return
+    if (error || !invitation) {
+      setErreur('Ce lien d\'invitation est invalide ou a expiré.')
+      setChargement(false)
+      return
     }
 
-  const user = session.user
+    if (new Date(invitation.expires_at) < new Date()) {
+      setErreur('Ce lien d\'invitation a expiré.')
+      setChargement(false)
+      return
+    }
 
-  const { data: dejaMembre } = await supabase
-    .from('membres')
-    .select('id')
-    .eq('id_groupe', groupe.id)
-    .eq('id_profil', user.id)
-    .single()
+    const { data: groupeData } = await supabase
+      .from('groupes')
+      .select('*')
+      .eq('id', invitation.id_groupe)
+      .maybeSingle()
 
-  if (dejaMembre) {
+    const { data: membresData } = await supabase
+      .from('membres')
+      .select('id, profils(pseudo)')
+      .eq('id_groupe', invitation.id_groupe)
+
+    setGroupe(groupeData)
+    setMembres(membresData || [])
+    setChargement(false)
+  }
+
+  async function handleRejoindre() {
+    setRejoindreChargement(true)
+
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      navigate(`/connexion?redirect=/rejoindre/${token}`)
+      return
+    }
+
+    const user = session.user
+
+    const { data: dejaMembre } = await supabase
+      .from('membres')
+      .select('id')
+      .eq('id_groupe', groupe.id)
+      .eq('id_profil', user.id)
+      .maybeSingle()
+
+    if (dejaMembre) {
+      navigate(`/groupe/${groupe.id}`)
+      return
+    }
+
+    const { error } = await supabase
+      .from('membres')
+      .insert({ id_profil: user.id, id_groupe: groupe.id })
+
+    if (error) {
+      setErreur('Erreur lors de l\'ajout au groupe.')
+      setRejoindreChargement(false)
+      return
+    }
+
     navigate(`/groupe/${groupe.id}`)
-    return
   }
-
-  const { error } = await supabase
-    .from('membres')
-    .insert({ id_profil: user.id, id_groupe: groupe.id })
-
-  if (error) {
-    setErreur('Erreur lors de l\'ajout au groupe.')
-    setRejoindreChargement(false)
-    return
-  }
-
-  navigate(`/groupe/${groupe.id}`)
-}
 
   if (chargement) return <div className="p-6 text-sm text-muted-foreground">Chargement...</div>
 
   if (erreur) return (
     <div className="min-h-screen flex flex-col p-6 gap-4">
       <p className="text-sm text-destructive">{erreur}</p>
+      <Button variant="outline" onClick={() => navigate('/')}>Retour à l'accueil</Button>
+    </div>
+  )
+
+  if (!groupe) return (
+    <div className="min-h-screen flex flex-col p-6 gap-4">
+      <p className="text-sm text-destructive">Impossible de charger le groupe.</p>
       <Button variant="outline" onClick={() => navigate('/')}>Retour à l'accueil</Button>
     </div>
   )
@@ -115,7 +122,7 @@ async function chargerInvitation() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {membres.slice(0, 3).map(m => (
+          {membres.slice(0, 3).filter(m => m.profils).map(m => (
             <div key={m.id} className="flex items-center gap-1.5 bg-background rounded-full px-3 py-1">
               <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                 {m.profils.pseudo.slice(0, 2).toUpperCase()}

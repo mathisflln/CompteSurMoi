@@ -14,6 +14,7 @@ export default function NouvelleTransaction() {
   const [payeurId, setPayeurId] = useState(null)
   const [participants, setParticipants] = useState({})
   const [personnalise, setPersonnalise] = useState(false)
+  const [montantsPerso, setMontantsPerso] = useState({})
   const [erreur, setErreur] = useState(null)
   const [chargement, setChargement] = useState(false)
 
@@ -22,8 +23,6 @@ export default function NouvelleTransaction() {
   }, [])
 
   async function chargerMembres() {
-    const { data: { user } } = await supabase.auth.getUser()
-
     const { data } = await supabase
       .from('membres')
       .select('id, profils(pseudo)')
@@ -31,10 +30,8 @@ export default function NouvelleTransaction() {
 
     if (data) {
       setMembres(data)
-      // Par défaut : l'utilisateur connecté est le payeur
       const moi = data.find(m => m.profils)
       if (moi) setPayeurId(moi.id)
-      // Par défaut : tous les membres participent à parts égales
       const parts = {}
       data.forEach(m => { parts[m.id] = true })
       setParticipants(parts)
@@ -51,6 +48,10 @@ export default function NouvelleTransaction() {
     setParticipants(prev => ({ ...prev, [membreId]: !prev[membreId] }))
   }
 
+  function updateMontantPerso(membreId, valeur) {
+    setMontantsPerso(prev => ({ ...prev, [membreId]: valeur }))
+  }
+
   async function handleAjouter() {
     if (!nom.trim()) { setErreur('Le nom est obligatoire.'); return }
     if (!montant || parseFloat(montant) <= 0) { setErreur('Le montant est invalide.'); return }
@@ -62,10 +63,19 @@ export default function NouvelleTransaction() {
 
     if (participantsActifs.length === 0) { setErreur('Au moins un participant est requis.'); return }
 
+    if (personnalise) {
+      const total = participantsActifs.reduce((sum, membreId) => {
+        return sum + parseFloat(montantsPerso[membreId] || 0)
+      }, 0)
+      if (Math.abs(total - parseFloat(montant)) > 0.01) {
+        setErreur(`La somme des parts (${total}€) doit être égale au montant total (${montant}€).`)
+        return
+      }
+    }
+
     setChargement(true)
     setErreur(null)
 
-    // 1. Insérer la transaction
     const { data: tx, error: erreurTx } = await supabase
       .from('transactions')
       .insert({
@@ -84,12 +94,13 @@ export default function NouvelleTransaction() {
       return
     }
 
-    // 2. Insérer les répartitions
     const part = parseFloat((parseFloat(montant) / participantsActifs.length).toFixed(2))
     const repartitions = participantsActifs.map(membreId => ({
       id_transaction: tx.id,
       id_membre: membreId,
-      montant: part
+      montant: personnalise
+        ? parseFloat(montantsPerso[membreId] || partParticipant())
+        : part
     }))
 
     const { error: erreurRep } = await supabase
@@ -133,7 +144,7 @@ export default function NouvelleTransaction() {
       <div className="flex flex-col gap-2">
         <Label>Payé par</Label>
         <div className="flex gap-2 flex-wrap">
-          {membres.map(m => (
+          {membres.filter(m => m.profils).map(m => (
             <div
               key={m.id}
               onClick={() => setPayeurId(m.id)}
@@ -167,7 +178,7 @@ export default function NouvelleTransaction() {
         </div>
 
         <div className="flex flex-col gap-2">
-          {membres.map(m => (
+          {membres.filter(m => m.profils).map(m => (
             <div key={m.id} className="flex items-center gap-3 bg-muted rounded-lg px-3 py-2.5">
               <div
                 onClick={() => toggleParticipant(m.id)}
@@ -187,8 +198,9 @@ export default function NouvelleTransaction() {
                 <Input
                   type="number"
                   className="w-20 text-right text-sm h-8"
-                  value={participants[m.id] ? partParticipant() : '0.00'}
+                  value={participants[m.id] ? (montantsPerso[m.id] ?? partParticipant()) : '0.00'}
                   disabled={!participants[m.id]}
+                  onChange={e => updateMontantPerso(m.id, e.target.value)}
                 />
               ) : (
                 <span className="text-sm text-muted-foreground">
